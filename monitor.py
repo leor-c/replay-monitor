@@ -51,7 +51,7 @@ class PerStepPerformanceMetric(PerformanceMetric):
         pass
 
 
-class RLMonitor(gym.core.Wrapper, ABC):
+class RLMonitor(gym.core.Wrapper):
     """
     This class is intended to provide a convenient way of tracking the training / running process of a Reinforcement
     Learning algorithm over an environment that follows the OpenAI's Gym conventions.
