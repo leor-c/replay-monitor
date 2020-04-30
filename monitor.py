@@ -13,8 +13,8 @@ class PerformanceMetric(ABC):
     def track(self, *args, **kwargs):
         pass
 
-    @abstractmethod
     @property
+    @abstractmethod
     def value(self):
         """
         Compute and return the value of the performance metric.
