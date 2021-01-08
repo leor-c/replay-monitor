@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from typing import List
 from copy import deepcopy
 
+from db import DBWriter, PosInTrajectory
+
 
 class PerformanceMetric(ABC):
     @abstractmethod
@@ -57,11 +59,13 @@ class RLMonitor(gym.core.Wrapper):
     This class is intended to provide a convenient way of tracking the training / running process of a Reinforcement
     Learning algorithm over an environment that follows the OpenAI's Gym conventions.
     """
+    # TODO: Support Vector Envs.
 
     def __init__(self,
                  env: gym.Env,
                  performance_metrics: List[PerformanceMetric],
                  logging_directory: str = 'RLMonitorLogs',
+                 log_to_db: bool = False,
                  *arg, **kwargs):
         # initialize the directory for the logs:
         self.run_id = datetime.datetime.now().strftime("%d%m%Y-%H%M%S")
@@ -71,6 +75,18 @@ class RLMonitor(gym.core.Wrapper):
         self.performance_metrics: List[PerformanceMetric] = performance_metrics
         self.current_observation = None
 
+        self.log_to_db = log_to_db
+        self.db_file_path = os.path.join(logging_directory, 'monitor_db.h5')
+        self._db_writer = DBWriter(
+            state_shape=env.observation_space.shape,
+            action_shape=env.action_space.shape,
+            is_action_discrete=isinstance(env.action_space, (gym.spaces.Discrete, gym.spaces.MultiDiscrete)),
+            db_file=self.db_file_path,
+            total_steps_estimate=None
+        )
+        self._last_observation = None
+        self._is_first_observation = False
+
         super().__init__(env=env)
 
     def add_performance_metrics(self, performance_metrics: List[PerformanceMetric]):
@@ -78,12 +94,28 @@ class RLMonitor(gym.core.Wrapper):
 
     def step(self, action):
         next_observation, reward, done, info = self.env.step(action)
+        if self.log_to_db:
+            # determine position in trajectory:
+            self._db_writer.store_transition(
+                state=self._last_observation,
+                action=action,
+                reward=reward,
+                next_state=next_observation,
+                info=info,
+                pos_in_trajectory=self._determine_pos_in_trajectory(done)
+            )
+        self._is_first_observation = False
+
         self._track_performance(action=action, next_observation=next_observation, reward=reward, done=done, info=info)
         self.current_observation = deepcopy(next_observation)
         return next_observation, reward, done, info
 
     def reset(self, **kwargs):
         observation = self.env.reset(**kwargs)
+
+        self._last_observation = observation
+        self._is_first_observation = True
+
         self.current_observation = deepcopy(observation)
         for metric in self.performance_metrics:
             metric.new_episode()
@@ -128,4 +160,17 @@ class RLMonitor(gym.core.Wrapper):
         header = '| Hyper Parameter Name | Value | \n | --- | --- | \n'
         lines = [f'| {hp_k} | {hp_v} | \n' for hp_k, hp_v in hparams.items()]
         return header + ' '.join(lines)
+
+    def _determine_pos_in_trajectory(self, done) -> PosInTrajectory:
+        if self._is_first_observation:
+            if done:
+                pos = PosInTrajectory.ONLY
+            else:
+                pos = PosInTrajectory.FIRST
+        else:
+            if done:
+                pos = PosInTrajectory.LAST
+            else:
+                pos = PosInTrajectory.MID
+        return pos
 
