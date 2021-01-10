@@ -278,7 +278,7 @@ class UIManager:
         return fig
 
     def _generate_textual_action_reward_str(self):
-        text = f'Reward: {self.data_manager.r[0]}<br>Action: {self.data_manager.a[0]}'
+        text = f'<h3>Reward: {self.data_manager.r[0]}<br>Action: {self.data_manager.a[0]}</h3>'
         return text
 
 data_manager = DataManager()
