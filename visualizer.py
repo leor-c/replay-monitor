@@ -20,16 +20,6 @@ except Exception as e:
     print(e)
     kwargs = {}
 
-def read_metadata():
-    db_reader = DBReader(**kwargs)
-    log_ids = db_reader.get_logs_ids()
-
-    first_id = log_ids[0]
-    trajectories_lengths = db_reader.get_trajectories_lengths(first_id)
-
-    n_state_elements = db_reader.get_num_of_state_elements(first_id)
-    return log_ids, trajectories_lengths, n_state_elements
-
 def get_transition(log_id: str, trajectory_index: int, transition_index: int):
     db_reader = DBReader(**kwargs)
     data = db_reader.get_transition_data(log_id, trajectory_index=trajectory_index, transition_index=transition_index)
@@ -78,7 +68,6 @@ def trajectory_changed_handler(attr, old, new):
 
 
 def log_select_change_handler(attr, old, new):
-    # TODO: implement (call rebuild function of the states layouts)
     global data_manager, ui_manager
     data_manager.change_transition(0, 0, new)
     ui_manager.update_ui_due_to_log_change()
