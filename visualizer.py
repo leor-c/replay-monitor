@@ -5,7 +5,7 @@ from typing import Tuple, List
 import numpy as np
 from bokeh.io import curdoc
 # from bokeh.io import show
-from bokeh.models import Panel, Tabs, Slider, ColumnDataSource, Select, Spinner
+from bokeh.models import Panel, Tabs, Slider, ColumnDataSource, Select, Spinner, Div
 from bokeh.plotting import figure
 from bokeh.layouts import column, row
 
@@ -64,6 +64,8 @@ def step_slider_change_handler(attr, old, new):
     global data_manager, ui_manager
     data_manager.change_transition(new)
 
+    ui_manager.step_spinner.value = new
+    ui_manager.step_slider.value = new
     ui_manager.update_ui_due_to_transition_change()
 
 
@@ -151,11 +153,12 @@ class DataManager:
             self.current_log = log_id
 
         if trajectory_index is not None:
-            if self.trajectory_index != trajectory_index or is_log_changed:
+            is_different_trajectory = self.trajectory_index != trajectory_index
+            self.trajectory_index = trajectory_index
+            if is_different_trajectory or is_log_changed:
                 db_reader = DBReader(**kwargs)
                 self.trajectory_rewards = db_reader.get_trajectory_rewards(log_id=self.current_log,
                                                                            trajectory_index=self.trajectory_index)
-            self.trajectory_index = trajectory_index
 
         self.transition_index = transition_index
 
@@ -195,9 +198,15 @@ class UIManager:
         self.trajectory_rewards_fig = None
         self._create_trajectory_rewards_ui()
 
+        self.textual_action_reward = Div(text=self._generate_textual_action_reward_str())
+
         self.states_layout = row(self.state_layout, self.next_state_layout)
-        self.sliders_layout = column(self.step_slider, self.trajectory_select, sizing_mode='stretch_width')
-        self.layout = column(self.log_select, self.trajectory_rewards_fig, self.states_layout, self.sliders_layout)
+        self.sliders_layout = column(row(self.step_slider, self.step_spinner), self.trajectory_select, sizing_mode='stretch_width')
+        self.layout = column(self.log_select,
+                             self.trajectory_rewards_fig,
+                             self.textual_action_reward,
+                             self.states_layout,
+                             self.sliders_layout)
 
     def update_ui_due_to_log_change(self):
         self._create_states_ui()
@@ -206,8 +215,13 @@ class UIManager:
         self.rewards_data_source.stream(new_data=create_rewards_data_dict(self.data_manager.trajectory_rewards),
                                         rollover=len(self.data_manager.trajectory_rewards))
 
+        self.trajectory_select.high = len(self.data_manager.trajectories_lengths)-1
+        self.trajectory_select.value = self.data_manager.trajectory_index
+
         self.step_slider.value = self.data_manager.transition_index
         self.step_slider.end = self.data_manager.get_current_trajectory_length()-1
+        self.step_spinner.high = self.step_slider.end
+        self.step_spinner.value = self.step_slider.value
 
     def update_ui_due_to_transition_change(self):
         state_data_dicts = create_state_data_dict_from_state(self.data_manager.s)
@@ -218,6 +232,8 @@ class UIManager:
             self.next_state_data_sources[i].stream(new_data=next_state_data_dicts[i],
                                                          rollover=self.data_manager.state_elements_sizes[i])
 
+        self.textual_action_reward.text = self._generate_textual_action_reward_str()
+
     def update_ui_due_to_trajectory_change(self):
         self.update_ui_due_to_transition_change()
 
@@ -226,11 +242,16 @@ class UIManager:
 
         self.step_slider.value = self.data_manager.transition_index
         self.step_slider.end = self.data_manager.get_current_trajectory_length() - 1
+        self.step_spinner.high = self.step_slider.end
+        self.step_spinner.value = self.step_slider.value
 
     def _generate_step_slider(self):
         self.step_slider = Slider(start=0, end=self.data_manager.get_current_trajectory_length()-1,
-                                  value=self.data_manager.transition_index, step=1, title="Time Step")
+                                  value=self.data_manager.transition_index, step=1, title="Time Step",
+                                  sizing_mode='stretch_width')
+        self.step_spinner = Spinner(low=0, high=self.step_slider.end, step=1, value=self.step_slider.value, width=100)
         self.step_slider.on_change('value', step_slider_change_handler)
+        self.step_spinner.on_change('value', step_slider_change_handler)
 
     def _generate_trajectory_select(self):
         self.trajectory_select = Spinner(
@@ -255,6 +276,10 @@ class UIManager:
         fig.circle(x='x', y='rewards', source=self.rewards_data_source, name='trajectory_rewards_plot')
         self.trajectory_rewards_fig = fig
         return fig
+
+    def _generate_textual_action_reward_str(self):
+        text = f'Reward: {self.data_manager.r[0]}<br>Action: {self.data_manager.a[0]}'
+        return text
 
 data_manager = DataManager()
 

@@ -76,6 +76,9 @@ class DBWriter:
 
         self._start_new_trajectory_flag = False
 
+    def __del__(self):
+        self.db.close()
+
     def store_transition(
             self,
             state: Union[np.ndarray, Tuple[np.ndarray]],
@@ -256,6 +259,8 @@ class DBReader:
 
         trajectories = [(0, 0)]
         with self.db as db:
-            trajectories.extend(db.get_node(f'/{LOGS_GROUP}/{log_id}/{TRAJECTORIES_ARRAY}').read())
+            stored_data = db.get_node(f'/{LOGS_GROUP}/{log_id}/{TRAJECTORIES_ARRAY}').read()
+            if len(stored_data) > 0:
+                trajectories.extend(np.array(stored_data, dtype=int).squeeze(1))
         return trajectories
 
