@@ -226,6 +226,17 @@ class DBReader:
 
         return state, action, reward, next_state
 
+    def get_trajectory_rewards(self, log_id: str, trajectory_index: int):
+        trajectories_start_indices = self._get_log_trajectories(log_id=log_id)
+        trajectories_lengths = self.get_trajectories_lengths(log_id=log_id)
+        if len(trajectories_lengths) == 0:
+            return None
+        with self.db as db:
+            start_index = trajectories_start_indices[trajectory_index][1]
+            end_index = trajectories_start_indices[trajectory_index][1] + trajectories_lengths[trajectory_index]
+            rewards = db.get_node(f'/{LOGS_GROUP}/{log_id}/{LOG_REWARDS_ARRAY}')[start_index:end_index]
+            return rewards
+
     def get_num_of_state_elements(self, log_id: str):
         with self.db as db:
             return db.get_node(f'/{LOGS_GROUP}/{log_id}/{LOG_STATES_GROUP}')._v_nchildren

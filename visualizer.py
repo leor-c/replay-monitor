@@ -53,6 +53,13 @@ def create_state_data_dict_from_state(state: Tuple[np.ndarray]):
     return state_data_dicts
 
 
+def create_rewards_data_dict(rewards: np.ndarray):
+    return {
+        'rewards': rewards,
+        'x': list(range(len(data_manager.trajectory_rewards)))
+    }
+
+
 def step_slider_change_handler(attr, old, new):
     global data_manager, ui_manager
     data_manager.change_transition(new)
@@ -130,19 +137,30 @@ class DataManager:
         self.trajectories_lengths = db_reader.get_trajectories_lengths(self.current_log)
         self.n_state_elements = db_reader.get_num_of_state_elements(self.current_log)
 
+        self.trajectory_rewards = db_reader.get_trajectory_rewards(log_id=self.current_log,
+                                                                   trajectory_index=self.trajectory_index)
+
         self.s, self.a, self.r, self.s2 = get_transition(self.current_log, self.trajectory_index, self.transition_index)
 
         self.state_elements_sizes = [state_elem.size for state_elem in self.s]
 
     def change_transition(self, transition_index: int, trajectory_index: int = None, log_id: str = None):
-        if trajectory_index is not None:
-            self.trajectory_index = trajectory_index
-        self.transition_index = transition_index
         is_log_changed = False
         if log_id is not None:
             is_log_changed = log_id != self.current_log
             self.current_log = log_id
+
+        if trajectory_index is not None:
+            if self.trajectory_index != trajectory_index or is_log_changed:
+                db_reader = DBReader(**kwargs)
+                self.trajectory_rewards = db_reader.get_trajectory_rewards(log_id=self.current_log,
+                                                                           trajectory_index=self.trajectory_index)
+            self.trajectory_index = trajectory_index
+
+        self.transition_index = transition_index
+
         self.s, self.a, self.r, self.s2 = get_transition(self.current_log, self.trajectory_index, self.transition_index)
+
         if log_id is not None and is_log_changed:
             db_reader = DBReader(**kwargs)
             self.trajectories_lengths = db_reader.get_trajectories_lengths(self.current_log)
@@ -173,13 +191,20 @@ class UIManager:
         self.states_layout = None
         self._create_states_ui()
 
+        self.rewards_data_source = ColumnDataSource(data=create_rewards_data_dict(self.data_manager.trajectory_rewards))
+        self.trajectory_rewards_fig = None
+        self._create_trajectory_rewards_ui()
+
         self.states_layout = row(self.state_layout, self.next_state_layout)
         self.sliders_layout = column(self.step_slider, self.trajectory_select, sizing_mode='stretch_width')
-        self.layout = column(self.log_select, self.states_layout, self.sliders_layout)
+        self.layout = column(self.log_select, self.trajectory_rewards_fig, self.states_layout, self.sliders_layout)
 
     def update_ui_due_to_log_change(self):
         self._create_states_ui()
         self.states_layout.children = [self.state_layout, self.next_state_layout]
+
+        self.rewards_data_source.stream(new_data=create_rewards_data_dict(self.data_manager.trajectory_rewards),
+                                        rollover=len(self.data_manager.trajectory_rewards))
 
         self.step_slider.value = self.data_manager.transition_index
         self.step_slider.end = self.data_manager.get_current_trajectory_length()-1
@@ -196,11 +221,13 @@ class UIManager:
     def update_ui_due_to_trajectory_change(self):
         self.update_ui_due_to_transition_change()
 
+        self.rewards_data_source.stream(new_data=create_rewards_data_dict(self.data_manager.trajectory_rewards),
+                                        rollover=len(self.data_manager.trajectory_rewards))
+
         self.step_slider.value = self.data_manager.transition_index
         self.step_slider.end = self.data_manager.get_current_trajectory_length() - 1
 
     def _generate_step_slider(self):
-        print(f'slider end: {self.data_manager.get_current_trajectory_length()}')
         self.step_slider = Slider(start=0, end=self.data_manager.get_current_trajectory_length()-1,
                                   value=self.data_manager.transition_index, step=1, title="Time Step")
         self.step_slider.on_change('value', step_slider_change_handler)
@@ -222,6 +249,12 @@ class UIManager:
                                         for data_dict in create_state_data_dict_from_state(self.data_manager.s2)]
         self.state_layout = create_state_layout(self.data_manager.s, self.state_data_sources)
         self.next_state_layout = create_state_layout(self.data_manager.s2, self.next_state_data_sources)
+
+    def _create_trajectory_rewards_ui(self):
+        fig = figure(plot_width=600, plot_height=300, sizing_mode='stretch_width')
+        fig.circle(x='x', y='rewards', source=self.rewards_data_source, name='trajectory_rewards_plot')
+        self.trajectory_rewards_fig = fig
+        return fig
 
 data_manager = DataManager()
 
