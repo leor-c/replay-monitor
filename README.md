@@ -31,8 +31,9 @@ import gym
 
 env = gym.make('Breakout-v0')
 env = Monitor(env, log_to_db=True)
-
-# use the environment as usual, for example:
+```
+Now, you can use the environment as usual, for example:
+```
 env.reset()
 for i in range(300):
     action = env.action_space.sample()
