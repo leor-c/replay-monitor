@@ -3,14 +3,14 @@ from enum import Enum, auto
 from typing import Tuple
 
 import numpy as np
-# from bokeh.io import curdoc
-# from bokeh.io import show
 from bokeh.models import Panel, Tabs, Slider, ColumnDataSource, Select, Spinner, Div
 from bokeh.plotting import figure
 from bokeh.layouts import column, row
 from bokeh.server.server import Server
 
 from replay_monitor.db import DBReader
+
+from .monitor import DEFAULT_LOGS_DIR, DEFAULT_DB_FILENAME
 
 
 def create_state_data_dict_from_state(state: Tuple[np.ndarray]):
@@ -89,7 +89,7 @@ def determine_state_element_plot_type(state_elem: np.ndarray) -> StateElementPlo
     elif len(state_elem.shape) == 3 and state_elem.shape[2] == 3:
         return StateElementPlotType.COLOR_IMAGE
 
-def create_state_layout(state, data_sources):
+def create_state_layout(state, data_sources, title):
     tabs_list = []
     for i, element in enumerate(state):
         if len(element.shape) > 1 and element.shape[0] == 1:
@@ -113,7 +113,11 @@ def create_state_layout(state, data_sources):
             continue
 
         tabs_list.append(Panel(child=fig, title=f"State Element {i}"))
-    return Tabs(tabs=tabs_list)
+    state_layout = column(
+        Div(text=f"<h2>{title}</h2>"),
+        Tabs(tabs=tabs_list)
+    )
+    return state_layout
 
 
 class DataManager:
@@ -264,8 +268,8 @@ class UIManager:
                                    for data_dict in create_state_data_dict_from_state(self.data_manager.s)]
         self.next_state_data_sources = [ColumnDataSource(data=data_dict)
                                         for data_dict in create_state_data_dict_from_state(self.data_manager.s2)]
-        self.state_layout = create_state_layout(self.data_manager.s, self.state_data_sources)
-        self.next_state_layout = create_state_layout(self.data_manager.s2, self.next_state_data_sources)
+        self.state_layout = create_state_layout(self.data_manager.s, self.state_data_sources, 'State')
+        self.next_state_layout = create_state_layout(self.data_manager.s2, self.next_state_data_sources, 'Next State')
 
     def _create_trajectory_rewards_ui(self):
         fig = figure(plot_width=600, plot_height=300, sizing_mode='stretch_width')
@@ -274,11 +278,11 @@ class UIManager:
         return fig
 
     def _generate_textual_action_reward_str(self):
-        text = f'<h3>Reward: {self.data_manager.r[0]}<br>Action: {self.data_manager.a[0]}</h3>'
+        text = f'<h4>Reward: {self.data_manager.r[0]}<br>Action: {self.data_manager.a[0]}</h4>'
         return text
 
 
-db_file_path = os.path.join('../RLMonitorLogs', 'monitor_db.h5')
+db_file_path = os.path.join(DEFAULT_LOGS_DIR, DEFAULT_DB_FILENAME)
 data_manager = None
 ui_manager = None
 
@@ -290,11 +294,11 @@ def start_app(doc):
     doc.add_root(ui_manager.layout)
 
 
-def _start_server(db_path: str):
+def _start_server(db_path: str = None):
     global db_file_path
 
-    assert db_path is not None
-    db_file_path = db_path
+    if db_path is not None:
+        db_file_path = db_path
 
     server = Server({'/': start_app}, num_procs=1)
     server.start()
@@ -309,7 +313,7 @@ def start_server():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--db_path', required=True)
+    parser.add_argument('--db_path', required=False)
     args = parser.parse_args()
 
     _start_server(args.db_path)

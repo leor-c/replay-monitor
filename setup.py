@@ -11,7 +11,8 @@ setuptools.setup(
     description="A tool for easy data exploration in reinforcement learning environments.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/liorcohen5/",
+    url="https://github.com/liorcohen5/replay-monitor",
+    keywords=['reinforcement learning', 'tool', 'data exploration', 'replay', 'monitor', 'analytical tool'],
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

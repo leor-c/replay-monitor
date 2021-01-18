@@ -1,6 +1,6 @@
 import os
 import unittest
-from replay_monitor.monitor import Monitor
+from replay_monitor import Monitor
 import gym
 from replay_monitor.db import DBReader
 
@@ -101,7 +101,8 @@ class MyTestCase(unittest.TestCase):
 
     def test_start_server(self):
         from replay_monitor.server import _start_server
-        _start_server(os.path.join('..' ,'RLMonitorLogs', 'monitor_db.h5'))
+
+        _start_server(None)
 
 
 if __name__ == '__main__':

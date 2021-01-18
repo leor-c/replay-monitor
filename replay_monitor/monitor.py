@@ -61,6 +61,10 @@ def get_space_shape(space: gym.spaces.Space):
         return space.shape
 
 
+DEFAULT_LOGS_DIR = 'monitor-logs'
+DEFAULT_DB_FILENAME = 'monitor_db.h5'
+
+
 class Monitor(gym.core.Wrapper):
     """
     This class is intended to provide a convenient way of tracking the training / running process of a Reinforcement
@@ -70,20 +74,21 @@ class Monitor(gym.core.Wrapper):
 
     def __init__(self,
                  env: gym.Env,
-                 performance_metrics: List[PerformanceMetric],
-                 logging_directory: str = 'RLMonitorLogs',
+                 performance_metrics: List[PerformanceMetric] = None,
                  log_to_db: bool = False,
+                 logging_directory: str = DEFAULT_LOGS_DIR,
                  *arg, **kwargs):
         # initialize the directory for the logs:
         self.run_id = datetime.datetime.now().strftime("%d%m%Y-%H%M%S")
         logging_path = self._generate_logging_path(logging_directory=logging_directory, run_id=self.run_id)
 
         self.summary_writer = tf.summary.create_file_writer(logging_path)
-        self.performance_metrics: List[PerformanceMetric] = performance_metrics
+        self.performance_metrics: List[PerformanceMetric] = performance_metrics \
+            if performance_metrics is not None else []
         self.current_observation = None
 
         self.log_to_db = log_to_db
-        self.db_file_path = os.path.join(logging_directory, 'monitor_db.h5')
+        self.db_file_path = os.path.join(logging_directory, DEFAULT_DB_FILENAME)
         self._db_writer = DBWriter(
             state_shape=get_space_shape(env.observation_space),
             action_shape=get_space_shape(env.action_space),
