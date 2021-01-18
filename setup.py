@@ -20,7 +20,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    Install_requires=['gym', 'bokeh', 'tensorflow', 'numpy', 'tables'],
+    install_requires=['gym', 'bokeh', 'tensorflow', 'numpy', 'tables'],
     entry_points={
         'console_scripts': ['replay-monitor=replay_monitor.server:start_server'],
     },
