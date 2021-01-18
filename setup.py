@@ -12,7 +12,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/liorcohen5/replay-monitor",
-    download_url="https://github.com/liorcohen5/replay-monitor/archive/0.0.1.tar.gz",
+    download_url="https://github.com/liorcohen5/replay-monitor/archive/0.0.2.tar.gz",
     keywords=['reinforcement learning', 'tool', 'data exploration', 'replay', 'monitor', 'analytical tool'],
     packages=setuptools.find_packages(),
     classifiers=[
