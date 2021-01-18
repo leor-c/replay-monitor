@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import List
 from copy import deepcopy
 
-from db import DBWriter, PosInTrajectory
+from replay_monitor.db import DBWriter, PosInTrajectory
 
 
 class PerformanceMetric(ABC):
@@ -54,7 +54,14 @@ class PerStepPerformanceMetric(PerformanceMetric):
         pass
 
 
-class RLMonitor(gym.core.Wrapper):
+def get_space_shape(space: gym.spaces.Space):
+    if isinstance(space, gym.spaces.Tuple):
+        return tuple(get_space_shape(space) for space in space.spaces)
+    else:
+        return space.shape
+
+
+class Monitor(gym.core.Wrapper):
     """
     This class is intended to provide a convenient way of tracking the training / running process of a Reinforcement
     Learning algorithm over an environment that follows the OpenAI's Gym conventions.
@@ -78,8 +85,8 @@ class RLMonitor(gym.core.Wrapper):
         self.log_to_db = log_to_db
         self.db_file_path = os.path.join(logging_directory, 'monitor_db.h5')
         self._db_writer = DBWriter(
-            state_shape=env.observation_space.shape,
-            action_shape=env.action_space.shape,
+            state_shape=get_space_shape(env.observation_space),
+            action_shape=get_space_shape(env.action_space),
             is_action_discrete=isinstance(env.action_space, (gym.spaces.Discrete, gym.spaces.MultiDiscrete)),
             db_file=self.db_file_path,
             total_steps_estimate=None

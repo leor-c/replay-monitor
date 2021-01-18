@@ -1,29 +1,16 @@
-import argparse
+import os
 from enum import Enum, auto
-from typing import Tuple, List
+from typing import Tuple
 
 import numpy as np
-from bokeh.io import curdoc
+# from bokeh.io import curdoc
 # from bokeh.io import show
 from bokeh.models import Panel, Tabs, Slider, ColumnDataSource, Select, Spinner, Div
 from bokeh.plotting import figure
 from bokeh.layouts import column, row
+from bokeh.server.server import Server
 
-from db import DBReader
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--db_file')
-try:
-    args = parser.parse_args()
-    kwargs = {'db_file': args.db_file}
-except Exception as e:
-    print(e)
-    kwargs = {}
-
-def get_transition(log_id: str, trajectory_index: int, transition_index: int):
-    db_reader = DBReader(**kwargs)
-    data = db_reader.get_transition_data(log_id, trajectory_index=trajectory_index, transition_index=transition_index)
-    return data
+from replay_monitor.db import DBReader
 
 
 def create_state_data_dict_from_state(state: Tuple[np.ndarray]):
@@ -130,8 +117,9 @@ def create_state_layout(state, data_sources):
 
 
 class DataManager:
-    def __init__(self):
-        db_reader = DBReader(**kwargs)
+    def __init__(self, db_file_path: str):
+        self.db_file_path = db_file_path
+        db_reader = DBReader(db_file=db_file_path)
         self.log_ids = db_reader.get_logs_ids()
         self.current_log = self.log_ids[0]
         self.trajectory_index = 0
@@ -142,9 +130,16 @@ class DataManager:
         self.trajectory_rewards = db_reader.get_trajectory_rewards(log_id=self.current_log,
                                                                    trajectory_index=self.trajectory_index)
 
-        self.s, self.a, self.r, self.s2 = get_transition(self.current_log, self.trajectory_index, self.transition_index)
+        self.s, self.a, self.r, self.s2 = self.get_transition(self.current_log, self.trajectory_index,
+                                                              self.transition_index)
 
         self.state_elements_sizes = [state_elem.size for state_elem in self.s]
+
+    def get_transition(self, log_id: str, trajectory_index: int, transition_index: int):
+        db_reader = DBReader(db_file=self.db_file_path)
+        data = db_reader.get_transition_data(log_id, trajectory_index=trajectory_index,
+                                             transition_index=transition_index)
+        return data
 
     def change_transition(self, transition_index: int, trajectory_index: int = None, log_id: str = None):
         is_log_changed = False
@@ -156,16 +151,17 @@ class DataManager:
             is_different_trajectory = self.trajectory_index != trajectory_index
             self.trajectory_index = trajectory_index
             if is_different_trajectory or is_log_changed:
-                db_reader = DBReader(**kwargs)
+                db_reader = DBReader(db_file=self.db_file_path)
                 self.trajectory_rewards = db_reader.get_trajectory_rewards(log_id=self.current_log,
                                                                            trajectory_index=self.trajectory_index)
 
         self.transition_index = transition_index
 
-        self.s, self.a, self.r, self.s2 = get_transition(self.current_log, self.trajectory_index, self.transition_index)
+        self.s, self.a, self.r, self.s2 = self.get_transition(self.current_log, self.trajectory_index,
+                                                              self.transition_index)
 
         if log_id is not None and is_log_changed:
-            db_reader = DBReader(**kwargs)
+            db_reader = DBReader(db_file=self.db_file_path)
             self.trajectories_lengths = db_reader.get_trajectories_lengths(self.current_log)
             self.n_state_elements = db_reader.get_num_of_state_elements(self.current_log)
             self.state_elements_sizes = [state_elem.size for state_elem in self.s]
@@ -281,8 +277,43 @@ class UIManager:
         text = f'<h3>Reward: {self.data_manager.r[0]}<br>Action: {self.data_manager.a[0]}</h3>'
         return text
 
-data_manager = DataManager()
 
-ui_manager = UIManager(data_manager=data_manager)
+db_file_path = os.path.join('../RLMonitorLogs', 'monitor_db.h5')
+data_manager = None
+ui_manager = None
 
-curdoc().add_root(ui_manager.layout)
+
+def start_app(doc):
+    global data_manager, ui_manager, db_file_path
+    data_manager = DataManager(db_file_path)
+    ui_manager = UIManager(data_manager=data_manager)
+    doc.add_root(ui_manager.layout)
+
+
+def _start_server(db_path: str):
+    global db_file_path
+
+    assert db_path is not None
+    db_file_path = db_path
+
+    server = Server({'/': start_app}, num_procs=1)
+    server.start()
+
+    print('Opening Bokeh application on http://localhost:5006/')
+
+    server.io_loop.add_callback(server.show, "/")
+    server.io_loop.start()
+
+
+def start_server():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--db_path', required=True)
+    args = parser.parse_args()
+
+    _start_server(args.db_path)
+
+
+if __name__ == '__main__':
+    start_server()
