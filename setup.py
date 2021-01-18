@@ -5,14 +5,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="replay-monitor", # Replace with your own username
-    version="0.0.4",
+    version="0.0.5",
     author="Leor Cohen",
     author_email="liorcohen5@gmail.com",
     description="A tool for easy data exploration in reinforcement learning environments.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/liorcohen5/replay-monitor",
-    download_url="https://github.com/liorcohen5/replay-monitor/archive/0.0.4.tar.gz",
+    download_url="https://github.com/liorcohen5/replay-monitor/archive/0.0.5.tar.gz",
     keywords=['reinforcement learning', 'tool', 'data exploration', 'replay', 'monitor', 'analytical tool'],
     packages=setuptools.find_packages(),
     classifiers=[
